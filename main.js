@@ -83,21 +83,15 @@ function createProjectItem(project) {
     </div>
     
     <div class="product-info">
-      <h2>${project.title}</h2>
-      <p class="description">${project.description}</p>
-      <div class="specs">
-        <div class="spec-row">
-          <span class="spec-label">COORDINATES / DIMENSIONS</span>
-          <span class="spec-value">${project.measures}</span>
-        </div>
-        <div class="spec-row">
-          <span class="spec-label">SYSTEM_STATUS</span>
-          <span class="spec-value">OPERATIONAL</span>
-        </div>
+      <div class="info-header">
+        <h2>${project.title}</h2>
+        <span class="measures-tag">${project.measures}</span>
       </div>
-      <div style="margin-top: 2rem; display: flex; gap: 1rem;">
-        <button class="edit-btn" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; padding: 5px 15px;">[EDIT_PROJECT]</button>
-        <button class="delete-btn" style="background: transparent; border: 1px solid #333; color: #333; cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; padding: 5px 15px;">[TERMINATE]</button>
+      <p class="simple-description">${project.description}</p>
+      
+      <div class="discreet-controls">
+        <button class="edit-btn">[EDIT]</button>
+        <button class="delete-btn">[DEL]</button>
       </div>
     </div>
   `;
@@ -120,10 +114,11 @@ function createProjectItem(project) {
   
   expandBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    const index = projects.findIndex(p => p.id === project.id);
     if (show3D) {
-      openFullscreen(project.modelUrl, '3d', project.extraAttributes, project.exposure, project.shadowIntensity, project.bgColor, project.shadowSoftness, project.hotspots, project.disableZoom, project.environment);
+      openFullscreen(index, '3d');
     } else {
-      openFullscreen(project.imageUrl, 'image');
+      openFullscreen(index, 'image');
     }
   });
 
@@ -148,34 +143,53 @@ function renderGallery() {
 const fsOverlay = document.getElementById('fullscreen-overlay');
 const fsContainer = document.getElementById('fs-container');
 const closeFs = document.getElementById('close-fs');
+const prevFs = document.getElementById('prev-fs');
+const nextFs = document.getElementById('next-fs');
 
-function openFullscreen(url, type, extraAttributes = '', exposure = 0.7, shadowIntensity = 1, bgColor = '#000', shadowSoftness = 1, hotspots = '', disableZoom = false, environment = 'neutral') {
+let currentFsIndex = 0;
+let currentFsType = '3d';
+
+function openFullscreen(index, type) {
+  currentFsIndex = index;
+  currentFsType = type;
+  const project = projects[index];
+  
   if (type === '3d') {
     fsContainer.innerHTML = `
       <model-viewer 
-        src="${url}" 
+        src="${project.modelUrl}" 
         camera-controls 
-        style="width: 100%; height: 100%; background-color: ${bgColor};"
-        exposure="${exposure}"
-        shadow-intensity="${shadowIntensity}"
-        shadow-softness="${shadowSoftness}"
-        environment-image="${environment}"
+        style="width: 100%; height: 100%; background-color: ${project.bgColor || '#000'};"
+        exposure="${project.exposure || 0.7}"
+        shadow-intensity="${project.shadowIntensity || 1}"
+        shadow-softness="${project.shadowSoftness || 1}"
+        environment-image="${project.environment || 'neutral'}"
         tone-mapping="neutral"
         crossorigin="anonymous"
-        ${disableZoom ? 'disable-zoom' : ''}
-        ${extraAttributes}
+        ${project.disableZoom ? 'disable-zoom' : ''}
+        ${project.extraAttributes || ''}
       >
-        ${hotspots}
+        ${project.hotspots || ''}
       </model-viewer>
     `;
   } else {
     fsContainer.innerHTML = `
-      <img src="${url}" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">
+      <img src="${project.imageUrl}" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem; background: #fff;">
     `;
   }
   fsOverlay.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
+
+prevFs.addEventListener('click', () => {
+  currentFsIndex = (currentFsIndex - 1 + projects.length) % projects.length;
+  openFullscreen(currentFsIndex, currentFsType);
+});
+
+nextFs.addEventListener('click', () => {
+  currentFsIndex = (currentFsIndex + 1) % projects.length;
+  openFullscreen(currentFsIndex, currentFsType);
+});
 
 closeFs.addEventListener('click', () => {
   fsOverlay.classList.add('hidden');
