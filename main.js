@@ -7,8 +7,9 @@ const DEFAULT_PROJECTS = [
     modelUrl: "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
     imageUrl: "https://placehold.co/1200x800/000000/00f3ff?text=PLANTA+TECNICA+A1",
     extraAttributes: 'camera-orbit="45deg 75deg 2.5m" auto-rotate',
-    exposure: 1,
-    shadowIntensity: 1
+    exposure: 0.7,
+    shadowIntensity: 2,
+    bgColor: "#0a0a0a"
   }
 ];
 
@@ -35,8 +36,9 @@ function createProjectItem(project) {
       ar
       ar-modes="webxr scene-viewer quick-look"
       environment-image="neutral"
-      exposure="${project.exposure || 1}"
-      shadow-intensity="${project.shadowIntensity || 1}"
+      exposure="${project.exposure || 0.7}"
+      shadow-intensity="${project.shadowIntensity || 2}"
+      style="background-color: ${project.bgColor || '#000'};"
       ${project.extraAttributes || ''}
     >
       <button slot="ar-button" class="ar-button">VIEW IN AR [MOBILE]</button>
@@ -110,7 +112,7 @@ function createProjectItem(project) {
   expandBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (show3D) {
-      openFullscreen(project.modelUrl, '3d', project.extraAttributes, project.exposure, project.shadowIntensity);
+      openFullscreen(project.modelUrl, '3d', project.extraAttributes, project.exposure, project.shadowIntensity, project.bgColor);
     } else {
       openFullscreen(project.imageUrl, 'image');
     }
@@ -145,13 +147,13 @@ const fsOverlay = document.getElementById('fullscreen-overlay');
 const fsContainer = document.getElementById('fs-container');
 const closeFs = document.getElementById('close-fs');
 
-function openFullscreen(url, type, extraAttributes = '', exposure = 1, shadowIntensity = 1) {
+function openFullscreen(url, type, extraAttributes = '', exposure = 0.7, shadowIntensity = 2, bgColor = '#000') {
   if (type === '3d') {
     fsContainer.innerHTML = `
       <model-viewer 
         src="${url}" 
         camera-controls 
-        style="width: 100%; height: 100%;"
+        style="width: 100%; height: 100%; background-color: ${bgColor};"
         exposure="${exposure}"
         shadow-intensity="${shadowIntensity}"
         environment-image="neutral"
@@ -195,12 +197,13 @@ function populateFormForEdit(project) {
   document.getElementById('p-glb-url').value = project.modelUrl.startsWith('data:') ? '' : project.modelUrl;
   document.getElementById('p-img-url').value = project.imageUrl.startsWith('data:') ? '' : project.imageUrl;
   document.getElementById('p-extra').value = project.extraAttributes || '';
-  document.getElementById('p-exposure').value = project.exposure || 1;
-  document.getElementById('p-shadow').value = project.shadowIntensity || 1;
+  document.getElementById('p-exposure').value = project.exposure || 0.7;
+  document.getElementById('p-shadow').value = project.shadowIntensity || 2;
+  document.getElementById('p-bgcolor').value = project.bgColor || "#0a0a0a";
   
   // Update labels
-  document.querySelector('.exp-val').innerText = project.exposure || 1;
-  document.querySelector('.shd-val').innerText = project.shadowIntensity || 1;
+  document.querySelector('.exp-val').innerText = project.exposure || 0.7;
+  document.querySelector('.shd-val').innerText = project.shadowIntensity || 2;
 
   adminTitle.innerText = "EDIT PROJECT";
   submitBtn.innerText = "UPDATE PROJECT";
@@ -211,8 +214,8 @@ function populateFormForEdit(project) {
 function resetForm() {
   editingProjectId = null;
   addForm.reset();
-  document.querySelector('.exp-val').innerText = "1";
-  document.querySelector('.shd-val').innerText = "1";
+  document.querySelector('.exp-val').innerText = "0.7";
+  document.querySelector('.shd-val').innerText = "2";
   adminTitle.innerText = "ADD NEW PROJECT";
   submitBtn.innerText = "REGISTER PROJECT";
 }
@@ -226,6 +229,7 @@ addForm.addEventListener('submit', async (e) => {
   const extraAttributes = document.getElementById('p-extra').value;
   const exposure = parseFloat(document.getElementById('p-exposure').value);
   const shadowIntensity = parseFloat(document.getElementById('p-shadow').value);
+  const bgColor = document.getElementById('p-bgcolor').value;
   
   const glbFile = document.getElementById('p-glb').files[0];
   const glbUrl = document.getElementById('p-glb-url').value;
@@ -256,7 +260,8 @@ addForm.addEventListener('submit', async (e) => {
     imageUrl: finalImg, 
     extraAttributes,
     exposure,
-    shadowIntensity
+    shadowIntensity,
+    bgColor
   };
 
   if (editingProjectId) {
