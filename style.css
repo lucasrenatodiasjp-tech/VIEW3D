@@ -42,7 +42,11 @@ body {
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
+}
+
+main {
+  margin-top: 1rem;
 }
 
 header {
@@ -85,7 +89,7 @@ header {
 .gallery-stack {
   display: flex;
   flex-direction: column;
-  gap: 10rem;
+  gap: 1.5rem;
 }
 
 /* Product Item */
@@ -94,9 +98,9 @@ header {
   grid-template-columns: 1.5fr 1fr;
   gap: 3rem;
   background: rgba(255, 255, 255, 0.02);
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 4px;
-  margin-bottom: 4rem;
+  margin-bottom: 1rem;
 }
 
 .viewer-wrapper {
