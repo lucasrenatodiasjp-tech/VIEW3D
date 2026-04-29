@@ -1,23 +1,30 @@
-const DEFAULT_PROJECTS = [
-  {
-    id: Date.now(),
-    title: "MÓDULO ALPHA-01",
-    description: "ESTRUTURA DE ALTA RESISTÊNCIA PARA AMBIENTES CORPORATIVOS. ACABAMENTO EM FIBRA DE CARBONO E POLÍMERO DE ALTA DENSIDADE.",
-    measures: "200x90x110cm",
-    modelUrl: "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
-    imageUrl: "https://placehold.co/1200x800/000000/00f3ff?text=PLANTA+TECNICA+A1",
-    extraAttributes: 'camera-orbit="45deg 75deg 2.5m" auto-rotate',
-    exposure: 0.7,
-    shadowIntensity: 2,
-    bgColor: "#0a0a0a"
-  }
-];
+import { db, storage } from './firebase.js';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot,
+  query,
+  orderBy
+} from "firebase/firestore";
+import { 
+  ref, 
+  uploadBytes, 
+  getDownloadURL 
+} from "firebase/storage";
 
-let projects = JSON.parse(localStorage.getItem('view3d_projects')) || DEFAULT_PROJECTS;
+// --- STATE MANAGEMENT (FIREBASE) ---
+const projectsCollection = collection(db, 'projects');
+let projects = [];
 
-function saveProjects() {
-  localStorage.setItem('view3d_projects', JSON.stringify(projects));
-}
+// Real-time synchronization
+onSnapshot(query(projectsCollection, orderBy('createdAt', 'desc')), (snapshot) => {
+  projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  renderGallery();
+});
 
 // --- CORE FUNCTIONS ---
 
@@ -26,7 +33,6 @@ function createProjectItem(project) {
   item.className = 'product-item';
   item.dataset.id = project.id;
   
-  // Create a template for model-viewer to safely inject attributes
   const viewerHtml = `
     <model-viewer 
       id="viewer-${project.id}"
@@ -91,7 +97,6 @@ function createProjectItem(project) {
     </div>
   `;
   
-  // Elements
   const prevBtn = item.querySelector('.prev-btn');
   const nextBtn = item.querySelector('.next-btn');
   const expandBtn = item.querySelector('.expand-btn');
@@ -108,7 +113,6 @@ function createProjectItem(project) {
   prevBtn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   nextBtn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   
-  // Dedicated Fullscreen Button
   expandBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (show3D) {
@@ -118,17 +122,10 @@ function createProjectItem(project) {
     }
   });
 
-  // Edit project
-  item.querySelector('.edit-btn').addEventListener('click', () => {
-    populateFormForEdit(project);
-  });
-
-  // Delete project
-  item.querySelector('.delete-btn').addEventListener('click', () => {
+  item.querySelector('.edit-btn').addEventListener('click', () => populateFormForEdit(project));
+  item.querySelector('.delete-btn').addEventListener('click', async () => {
     if (confirm('TERMINATE PROJECT DATA?')) {
-      projects = projects.filter(p => p.id !== project.id);
-      saveProjects();
-      renderGallery();
+      await deleteDoc(doc(db, 'projects', project.id));
     }
   });
   
@@ -166,7 +163,7 @@ function openFullscreen(url, type, extraAttributes = '', exposure = 0.7, shadowI
     `;
   }
   fsOverlay.classList.remove('hidden');
-  document.body.style.overflow = 'hidden'; // Prevent background scroll
+  document.body.style.overflow = 'hidden';
 }
 
 closeFs.addEventListener('click', () => {
@@ -194,14 +191,13 @@ function populateFormForEdit(project) {
   document.getElementById('p-title').value = project.title;
   document.getElementById('p-desc').value = project.description;
   document.getElementById('p-measures').value = project.measures;
-  document.getElementById('p-glb-url').value = project.modelUrl.startsWith('data:') ? '' : project.modelUrl;
-  document.getElementById('p-img-url').value = project.imageUrl.startsWith('data:') ? '' : project.imageUrl;
+  document.getElementById('p-glb-url').value = project.modelUrl;
+  document.getElementById('p-img-url').value = project.imageUrl;
   document.getElementById('p-extra').value = project.extraAttributes || '';
   document.getElementById('p-exposure').value = project.exposure || 0.7;
   document.getElementById('p-shadow').value = project.shadowIntensity || 2;
   document.getElementById('p-bgcolor').value = project.bgColor || "#0a0a0a";
   
-  // Update labels
   document.querySelector('.exp-val').innerText = project.exposure || 0.7;
   document.querySelector('.shd-val').innerText = project.shadowIntensity || 2;
 
@@ -220,61 +216,78 @@ function resetForm() {
   submitBtn.innerText = "REGISTER PROJECT";
 }
 
+async function uploadFile(file, path) {
+  if (!file) return null;
+  const storageRef = ref(storage, `${path}/${Date.now()}_${file.name}`);
+  const snapshot = await uploadBytes(storageRef, file);
+  return await getDownloadURL(snapshot.ref);
+}
+
 addForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   
-  const title = document.getElementById('p-title').value;
-  const desc = document.getElementById('p-desc').value;
-  const measures = document.getElementById('p-measures').value;
-  const extraAttributes = document.getElementById('p-extra').value;
-  const exposure = parseFloat(document.getElementById('p-exposure').value);
-  const shadowIntensity = parseFloat(document.getElementById('p-shadow').value);
-  const bgColor = document.getElementById('p-bgcolor').value;
-  
-  const glbFile = document.getElementById('p-glb').files[0];
-  const glbUrl = document.getElementById('p-glb-url').value;
-  const imgFile = document.getElementById('p-img').files[0];
-  const imgUrl = document.getElementById('p-img-url').value;
+  submitBtn.disabled = true;
+  submitBtn.innerText = "UPLOADING DATA...";
 
-  let finalGlb = glbUrl;
-  let finalImg = imgUrl;
+  try {
+    const title = document.getElementById('p-title').value;
+    const desc = document.getElementById('p-desc').value;
+    const measures = document.getElementById('p-measures').value;
+    const extraAttributes = document.getElementById('p-extra').value;
+    const exposure = parseFloat(document.getElementById('p-exposure').value);
+    const shadowIntensity = parseFloat(document.getElementById('p-shadow').value);
+    const bgColor = document.getElementById('p-bgcolor').value;
+    
+    const glbFile = document.getElementById('p-glb').files[0];
+    const glbUrlInput = document.getElementById('p-glb-url').value;
+    const imgFile = document.getElementById('p-img').files[0];
+    const imgUrlInput = document.getElementById('p-img-url').value;
 
-  // Preserve existing if not changed and it was data URL
-  if (editingProjectId) {
-    const existing = projects.find(p => p.id === editingProjectId);
-    if (!finalGlb && existing.modelUrl.startsWith('data:')) finalGlb = existing.modelUrl;
-    if (!finalImg && existing.imageUrl.startsWith('data:')) finalImg = existing.imageUrl;
+    let finalGlb = glbUrlInput;
+    let finalImg = imgUrlInput;
+
+    // Upload files if present
+    if (glbFile) finalGlb = await uploadFile(glbFile, 'models');
+    if (imgFile) finalImg = await uploadFile(imgFile, 'images');
+
+    // If editing and no new file/url, keep old ones
+    if (editingProjectId) {
+      const existing = projects.find(p => p.id === editingProjectId);
+      if (!finalGlb) finalGlb = existing.modelUrl;
+      if (!finalImg) finalImg = existing.imageUrl;
+    }
+
+    const projectData = { 
+      title, 
+      description: desc, 
+      measures, 
+      modelUrl: finalGlb || "https://modelviewer.dev/shared-assets/models/Astronaut.glb", 
+      imageUrl: finalImg || "https://placehold.co/1200x800/000000/00f3ff?text=PLANTA+TECNICA", 
+      extraAttributes,
+      exposure,
+      shadowIntensity,
+      bgColor,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (editingProjectId) {
+      await updateDoc(doc(db, 'projects', editingProjectId), projectData);
+    } else {
+      await addDoc(projectsCollection, { 
+        ...projectData, 
+        createdAt: new Date().toISOString() 
+      });
+    }
+
+    resetForm();
+    adminPanel.classList.add('hidden');
+  } catch (error) {
+    console.error("Firebase Error:", error);
+    alert("Error saving data. Check Firebase console rules.");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerText = "REGISTER PROJECT";
   }
-
-  if (!finalGlb && !glbFile) finalGlb = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
-  if (!finalImg && !imgFile) finalImg = "https://placehold.co/1200x800/000000/00f3ff?text=PLANTA+TECNICA";
-
-  if (glbFile) finalGlb = await fileToBase64(glbFile);
-  if (imgFile) finalImg = await fileToBase64(imgFile);
-
-  const projectData = { 
-    title, 
-    description: desc, 
-    measures, 
-    modelUrl: finalGlb, 
-    imageUrl: finalImg, 
-    extraAttributes,
-    exposure,
-    shadowIntensity,
-    bgColor
-  };
-
-  if (editingProjectId) {
-    const index = projects.findIndex(p => p.id === editingProjectId);
-    projects[index] = { ...projects[index], ...projectData };
-  } else {
-    projects.push({ id: Date.now(), ...projectData });
-  }
-
-  saveProjects();
-  renderGallery();
-  resetForm();
-  adminPanel.classList.add('hidden');
 });
 
 // Slider values feedback
@@ -284,16 +297,3 @@ document.getElementById('p-exposure').addEventListener('input', (e) => {
 document.getElementById('p-shadow').addEventListener('input', (e) => {
   document.querySelector('.shd-val').innerText = e.target.value;
 });
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Initial Render
-renderGallery();
-console.log('VIEW3D SYSTEM INITIALIZED [CORE_V1]');
