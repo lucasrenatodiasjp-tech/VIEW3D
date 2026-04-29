@@ -41,6 +41,7 @@ function createProjectItem(project) {
       camera-controls 
       ar
       ar-modes="webxr scene-viewer quick-look"
+      ar-scale="fixed"
       environment-image="${project.environment || 'neutral'}"
       tone-mapping="neutral"
       exposure="${project.exposure || 0.7}"
@@ -159,6 +160,8 @@ function openFullscreen(index, type) {
       <model-viewer 
         src="${project.modelUrl}" 
         camera-controls 
+        ar
+        ar-scale="fixed"
         style="width: 100%; height: 100%; background-color: ${project.bgColor || '#000'};"
         exposure="${project.exposure || 0.7}"
         shadow-intensity="${project.shadowIntensity || 1}"
