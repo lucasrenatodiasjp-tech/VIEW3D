@@ -1,4 +1,3 @@
-// --- STATE MANAGEMENT ---
 const DEFAULT_PROJECTS = [
   {
     id: Date.now(),
@@ -7,7 +6,9 @@ const DEFAULT_PROJECTS = [
     measures: "200x90x110cm",
     modelUrl: "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
     imageUrl: "https://placehold.co/1200x800/000000/00f3ff?text=PLANTA+TECNICA+A1",
-    extraAttributes: 'camera-orbit="45deg 75deg 2.5m" shadow-intensity="1" auto-rotate'
+    extraAttributes: 'camera-orbit="45deg 75deg 2.5m" auto-rotate',
+    exposure: 1,
+    shadowIntensity: 1
   }
 ];
 
@@ -34,7 +35,8 @@ function createProjectItem(project) {
       ar
       ar-modes="webxr scene-viewer quick-look"
       environment-image="neutral"
-      exposure="1"
+      exposure="${project.exposure || 1}"
+      shadow-intensity="${project.shadowIntensity || 1}"
       ${project.extraAttributes || ''}
     >
       <button slot="ar-button" class="ar-button">VIEW IN AR [MOBILE]</button>
@@ -108,7 +110,7 @@ function createProjectItem(project) {
   expandBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (show3D) {
-      openFullscreen(project.modelUrl, '3d', project.extraAttributes);
+      openFullscreen(project.modelUrl, '3d', project.extraAttributes, project.exposure, project.shadowIntensity);
     } else {
       openFullscreen(project.imageUrl, 'image');
     }
@@ -143,14 +145,15 @@ const fsOverlay = document.getElementById('fullscreen-overlay');
 const fsContainer = document.getElementById('fs-container');
 const closeFs = document.getElementById('close-fs');
 
-function openFullscreen(url, type, extraAttributes = '') {
+function openFullscreen(url, type, extraAttributes = '', exposure = 1, shadowIntensity = 1) {
   if (type === '3d') {
     fsContainer.innerHTML = `
       <model-viewer 
         src="${url}" 
         camera-controls 
         style="width: 100%; height: 100%;"
-        exposure="1"
+        exposure="${exposure}"
+        shadow-intensity="${shadowIntensity}"
         environment-image="neutral"
         ${extraAttributes}
       ></model-viewer>
@@ -192,7 +195,13 @@ function populateFormForEdit(project) {
   document.getElementById('p-glb-url').value = project.modelUrl.startsWith('data:') ? '' : project.modelUrl;
   document.getElementById('p-img-url').value = project.imageUrl.startsWith('data:') ? '' : project.imageUrl;
   document.getElementById('p-extra').value = project.extraAttributes || '';
+  document.getElementById('p-exposure').value = project.exposure || 1;
+  document.getElementById('p-shadow').value = project.shadowIntensity || 1;
   
+  // Update labels
+  document.querySelector('.exp-val').innerText = project.exposure || 1;
+  document.querySelector('.shd-val').innerText = project.shadowIntensity || 1;
+
   adminTitle.innerText = "EDIT PROJECT";
   submitBtn.innerText = "UPDATE PROJECT";
   adminPanel.classList.remove('hidden');
@@ -202,6 +211,8 @@ function populateFormForEdit(project) {
 function resetForm() {
   editingProjectId = null;
   addForm.reset();
+  document.querySelector('.exp-val').innerText = "1";
+  document.querySelector('.shd-val').innerText = "1";
   adminTitle.innerText = "ADD NEW PROJECT";
   submitBtn.innerText = "REGISTER PROJECT";
 }
@@ -213,6 +224,9 @@ addForm.addEventListener('submit', async (e) => {
   const desc = document.getElementById('p-desc').value;
   const measures = document.getElementById('p-measures').value;
   const extraAttributes = document.getElementById('p-extra').value;
+  const exposure = parseFloat(document.getElementById('p-exposure').value);
+  const shadowIntensity = parseFloat(document.getElementById('p-shadow').value);
+  
   const glbFile = document.getElementById('p-glb').files[0];
   const glbUrl = document.getElementById('p-glb-url').value;
   const imgFile = document.getElementById('p-img').files[0];
@@ -234,17 +248,36 @@ addForm.addEventListener('submit', async (e) => {
   if (glbFile) finalGlb = await fileToBase64(glbFile);
   if (imgFile) finalImg = await fileToBase64(imgFile);
 
+  const projectData = { 
+    title, 
+    description: desc, 
+    measures, 
+    modelUrl: finalGlb, 
+    imageUrl: finalImg, 
+    extraAttributes,
+    exposure,
+    shadowIntensity
+  };
+
   if (editingProjectId) {
     const index = projects.findIndex(p => p.id === editingProjectId);
-    projects[index] = { ...projects[index], title, description: desc, measures, modelUrl: finalGlb, imageUrl: finalImg, extraAttributes };
+    projects[index] = { ...projects[index], ...projectData };
   } else {
-    projects.push({ id: Date.now(), title, description: desc, measures, modelUrl: finalGlb, imageUrl: finalImg, extraAttributes });
+    projects.push({ id: Date.now(), ...projectData });
   }
 
   saveProjects();
   renderGallery();
   resetForm();
   adminPanel.classList.add('hidden');
+});
+
+// Slider values feedback
+document.getElementById('p-exposure').addEventListener('input', (e) => {
+  document.querySelector('.exp-val').innerText = e.target.value;
+});
+document.getElementById('p-shadow').addEventListener('input', (e) => {
+  document.querySelector('.shd-val').innerText = e.target.value;
 });
 
 function fileToBase64(file) {
