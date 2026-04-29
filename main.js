@@ -41,6 +41,15 @@ function createProjectItem(project) {
           <button slot="ar-button" class="ar-button">VIEW IN AR [MOBILE]</button>
         </model-viewer>
         <img src="${project.imageUrl}" class="measure-image" id="img-${project.id}" alt="ESQUEMA TÉCNICO">
+        
+        <button class="expand-btn" title="FULLSCREEN VIEW">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+        </button>
       </div>
       
       <div class="nav-arrows">
@@ -73,9 +82,10 @@ function createProjectItem(project) {
     </div>
   `;
   
-  // Toggle 3D/Image
+  // Elements
   const prevBtn = item.querySelector('.prev-btn');
   const nextBtn = item.querySelector('.next-btn');
+  const expandBtn = item.querySelector('.expand-btn');
   const viewer = item.querySelector('model-viewer');
   const img = item.querySelector('.measure-image');
   
@@ -89,10 +99,14 @@ function createProjectItem(project) {
   prevBtn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   nextBtn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   
-  // Fullscreen on click
-  const frame = item.querySelector('.content-frame');
-  frame.addEventListener('click', () => {
-    if (show3D) openFullscreen(project.modelUrl);
+  // Dedicated Fullscreen Button
+  expandBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (show3D) {
+      openFullscreen(project.modelUrl, '3d');
+    } else {
+      openFullscreen(project.imageUrl, 'image');
+    }
   });
 
   // Edit project
@@ -124,18 +138,25 @@ const fsOverlay = document.getElementById('fullscreen-overlay');
 const fsContainer = document.getElementById('fs-container');
 const closeFs = document.getElementById('close-fs');
 
-function openFullscreen(modelUrl) {
-  fsContainer.innerHTML = `
-    <model-viewer 
-      src="${modelUrl}" 
-      auto-rotate 
-      camera-controls 
-      style="width: 100%; height: 100%;"
-      exposure="1"
-      environment-image="neutral"
-    ></model-viewer>
-  `;
+function openFullscreen(url, type) {
+  if (type === '3d') {
+    fsContainer.innerHTML = `
+      <model-viewer 
+        src="${url}" 
+        auto-rotate 
+        camera-controls 
+        style="width: 100%; height: 100%;"
+        exposure="1"
+        environment-image="neutral"
+      ></model-viewer>
+    `;
+  } else {
+    fsContainer.innerHTML = `
+      <img src="${url}" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">
+    `;
+  }
   fsOverlay.classList.remove('hidden');
+  document.body.style.overflow = 'hidden'; // Prevent background scroll
 }
 
 closeFs.addEventListener('click', () => {
